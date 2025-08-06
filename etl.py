@@ -101,8 +101,9 @@ def merge_export(intake, demographics, salaries, phone_calls, meetings):
     - Base = demographics (has First Name + Telephone)
     - Merge intake, meetings, salaries by ClientID
     - Merge phone_calls by Telephone
+    - Merge duplicates by ClientID
     """
-    # Drop 'First Name' from all files except demographics
+    # Drop specific columns from all files except demographics, stopping duplicates
     for df in [intake, salaries, phone_calls, meetings]:
         for col in ["First Name", "MI", "Last Name"]:
             if col in df.columns:
@@ -124,6 +125,13 @@ def merge_export(intake, demographics, salaries, phone_calls, meetings):
             on="Telephone",
             how="outer",
             suffixes=("", "_Phone"))
+    
+    # Merge duplicates by ClientID, combining unique values for each column
+    client_data = (
+        client_data
+        .groupby("ClientID", dropna=False)  # Group only by ClientID
+        .agg(lambda x: " / ".join(sorted(set(str(v) for v in x if pd.notna(v) and str(v).strip() != ""))))
+        .reset_index())
 
     # Export to Excel
     client_data.to_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/merge/clients_data.xlsx", index=False)
