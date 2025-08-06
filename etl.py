@@ -25,34 +25,56 @@ def rename_columns(df):
 def client_id(df):
     """
     Create ClientID hierarchy:
+    - clean up columns
     - Start with First Name
     - If theres no First Name use Telephone
     - If duplicates: add Telephone
     """
     df = rename_columns(df)
 
-    # Start with First Name
+    # Clean up columns
     if "First Name" in df.columns:
-        df["ClientID"] = df["First Name"].astype(str).str.strip()
+        df["First Name"] = df["First Name"].astype(str).str.strip().fillna("")
+    if "Telephone" in df.columns:
+        df["Telephone"] = df["Telephone"].astype(str).str.strip().fillna("")
 
-        # Check duplicates
+    # Start with First Name 
+    if "First Name" in df.columns and df["First Name"].any():
+        df["ClientID"] = df["First Name"]
+
+        # Find duplicates on ClientID
         duplicates = df[df["ClientID"].duplicated(keep=False)]
 
-        # If duplicates exist, add Telephone
-        if not duplicates.empty and "Telephone" in df.columns:
-            df.loc[df["ClientID"].isin(duplicates["ClientID"]),
-                   "ClientID"] = df["First Name"].astype(str).str.strip() + "_" + df["Telephone"].astype(str)
+        if not duplicates.empty:
+            if "Telephone" in df.columns:
+                mask = df["ClientID"].isin(duplicates["ClientID"])
 
-        return df
-    
-    # If theres no First Name use Telephone
-    elif "Telephone" in df.columns:
-        df["ClientID"] = df["Telephone"].astype(str).str.strip()
-        return df
-    
+                # Add Telephone where available
+                df.loc[mask & (df["Telephone"] != ""), "ClientID"] = (
+                    df.loc[mask & (df["Telephone"] != ""), "First Name"] + "_" +
+                    df.loc[mask & (df["Telephone"] != ""), "Telephone"])
+
+                # Check if duplicates still exist after adding telephone
+                remaining_dups = df[df["ClientID"].duplicated(keep=False)]
+
+                if not remaining_dups.empty:
+                    # Append index to duplicates without unique telephone
+                    df.loc[remaining_dups.index, "ClientID"] = (
+                        df.loc[remaining_dups.index, "ClientID"] + "_" +
+                        df.loc[remaining_dups.index].groupby("ClientID").cumcount().astype(str))
+            else:
+                # No telephone column, append index to duplicates
+                df.loc[duplicates.index, "ClientID"] = (
+                    df.loc[duplicates.index, "ClientID"] + "_" +
+                    df.loc[duplicates.index].groupby("ClientID").cumcount().astype(str))
+
+    elif "Telephone" in df.columns and df["Telephone"].any():
+        df["ClientID"] = df["Telephone"]
+
     else:
-       print("No 'First Name' or 'Telephone' columns found; skipping ClientID creation.")
-       return df
+        print("No 'First Name' column found; skipping ClientID creation.")
+
+    return df
 
 
 def transform_data(intake, demographics, salaries, phone_calls, meetings):
@@ -73,20 +95,21 @@ def transform_data(intake, demographics, salaries, phone_calls, meetings):
 def merge_export(intake, demographics, salaries, phone_calls, meetings):
     """
     Merge cleaned datasets:
-    - Create ClientID from First Name + Telephone
-    - Phone calls merged by Telephone (then inherit ClientID)
+    - Base = demographics (has First Name + Telephone)
+    - Merge intake, meetings, salaries by ClientID
+    - Merge phone_calls by Telephone
     """
-    # Merge intake + demographics + meetings + salaries on ClientID
-    client_data = intake.merge(demographics, on="ClientID", how="outer", suffixes=("_Intake", "_Demo"))
+    # Start from demographics
+    client_data = demographics.merge(intake, on="ClientID", how="outer", suffixes=("_Demo", "_Intake"))
     client_data = client_data.merge(meetings, on="ClientID", how="outer", suffixes=("", "_Meeting"))
     client_data = client_data.merge(salaries, on="ClientID", how="outer", suffixes=("", "_Salary"))
 
-    # Merge phone_calls on Telephone instead of ClientID
+    # Merge phone_calls by Telephone
     if "Telephone" in phone_calls.columns and "Telephone" in client_data.columns:
         client_data = client_data.merge(
-            phone_calls, 
-            on="Telephone", 
-            how="outer", 
+            phone_calls,
+            on="Telephone",
+            how="outer",
             suffixes=("", "_Phone")
         )
 
