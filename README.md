@@ -24,10 +24,11 @@ AI integration of existing products to streamline consolidation. The organizatio
 
 ## Tools
 
-Python
-Pandas
-Microsoft Excel
-VSCode
+- Python
+- Pandas
+- Microsoft Excel
+- VSCode
+- Dropbox
 
 
 
