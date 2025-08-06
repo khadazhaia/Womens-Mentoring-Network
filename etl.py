@@ -13,25 +13,18 @@ def extract_excel():
     return intake, demographics, salaries, phone_calls, meetings
 
 
-def rename_columns(df):
-    """
-    Rename "Name" to "First Name" to match across all files
-    """
-    if "Name" in df.columns:
-        df = df.rename(columns={"Name": "First Name"})
-    return df
-
-
 def client_id(df):
     """
-    Create numeric ClientID:
-    - First Name
+    - Rename Columns, Clean & Fill Missing Values
+    - Start with First Name
     - If duplicate: add MI
     - If still duplicate: add Telephone
     - If still duplicate: add index
     - Finally map to numbers
     """
-    df = rename_columns(df)
+    # Rename Columns to match across files
+    if "Name" in df.columns:
+        df = df.rename(columns={"Name": "First Name"})
 
     # Clean and fill missing values before converting to string
     if "First Name" in df.columns:
@@ -74,8 +67,7 @@ def client_id(df):
                     # Append index
                     df.loc[duplicates.index, "ClientID"] = (
                         df.loc[duplicates.index, "ClientID"] + "_" +
-                        df.loc[duplicates.index].groupby("ClientID").cumcount().astype(str)
-                    )
+                        df.loc[duplicates.index].groupby("ClientID").cumcount().astype(str))
 
     elif "Telephone" in df.columns and df["Telephone"].any():
         df["ClientID"] = df["Telephone"]
@@ -89,14 +81,12 @@ def client_id(df):
 
     return df
 
+
 def transform_data(intake, demographics, salaries, phone_calls, meetings):
     """
-    - Rename Columns 
-    - Create ClientIDs
-    - Return cleaned dataframes
+    - Apply transformations and create ClientIDs
     """
-
-    # Create ClientID 
+    # Create ClientIDs
     intake = client_id(intake)
     demographics = client_id(demographics)
     salaries = client_id(salaries)
@@ -108,29 +98,32 @@ def transform_data(intake, demographics, salaries, phone_calls, meetings):
 
 def merge_export(intake, demographics, salaries, phone_calls, meetings):
     """
-    Merge cleaned datasets:
     - Base = demographics (has First Name + Telephone)
     - Merge intake, meetings, salaries by ClientID
     - Merge phone_calls by Telephone
     """
     # Drop 'First Name' from all files except demographics
     for df in [intake, salaries, phone_calls, meetings]:
-        if "First Name" in df.columns:
-            df.drop(columns=["First Name"], inplace=True)
+        for col in ["First Name", "MI", "Last Name"]:
+            if col in df.columns:
+                df.drop(columns=[col], inplace=True)
 
     # Start from demographics
     client_data = demographics.merge(intake, on="ClientID", how="outer", suffixes=("_Demo", "_Intake"))
     client_data = client_data.merge(meetings, on="ClientID", how="outer", suffixes=("", "_Meeting"))
     client_data = client_data.merge(salaries, on="ClientID", how="outer", suffixes=("", "_Salary"))
 
-    # Merge phone_calls by Telephone
+    # Before merging, drop ClientID so it doesn't create a duplicate
+    if "ClientID" in phone_calls.columns:
+        phone_calls = phone_calls.drop(columns=["ClientID"])
+
+    # Merge by Telephone
     if "Telephone" in phone_calls.columns and "Telephone" in client_data.columns:
         client_data = client_data.merge(
             phone_calls,
             on="Telephone",
             how="outer",
-            suffixes=("", "_Phone")
-        )
+            suffixes=("", "_Phone"))
 
     # Export to Excel
     client_data.to_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/clients_data.xlsx", index=False)
@@ -147,7 +140,7 @@ def main():
 
     # Load
     merged_data = merge_export(intake, demographics, salaries, phone_calls, meetings)
-    print("✅ Merging complete! File saved as clients_data.xlsx")
+    print("Merging complete! File saved as clients_data.xlsx")
 
 
 if __name__ == "__main__":
