@@ -5,11 +5,11 @@ def extract_excel():
     """
     Load Excel files
     """
-    demographics = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/demographics.xlsx")
-    intake = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/intake.xlsx")
-    meetings = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/meetings.xlsx")
-    phone_calls = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/phone_calls.xlsx")
-    salaries = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/salaries.xlsx")
+    demographics = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/raw/demographics.xlsx")
+    intake = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/raw/intake.xlsx")
+    meetings = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/raw/meetings.xlsx")
+    phone_calls = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/raw/phone_calls.xlsx")
+    salaries = pd.read_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/raw/salaries.xlsx")
     return intake, demographics, salaries, phone_calls, meetings
 
 
@@ -126,7 +126,7 @@ def merge_export(intake, demographics, salaries, phone_calls, meetings):
             suffixes=("", "_Phone"))
 
     # Export to Excel
-    client_data.to_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/clients_data.xlsx", index=False)
+    client_data.to_excel("/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/merge/clients_data.xlsx", index=False)
     return client_data
 
 
