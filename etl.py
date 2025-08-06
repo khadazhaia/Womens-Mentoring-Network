@@ -24,58 +24,70 @@ def rename_columns(df):
 
 def client_id(df):
     """
-    Create ClientID hierarchy:
-    - clean up columns
-    - Start with First Name
-    - If theres no First Name use Telephone
-    - If duplicates: add Telephone
+    Create numeric ClientID:
+    - First Name
+    - If duplicate: add MI
+    - If still duplicate: add Telephone
+    - If still duplicate: add index
+    - Finally map to numbers
     """
     df = rename_columns(df)
 
-    # Clean up columns
+    # Clean and fill missing values before converting to string
     if "First Name" in df.columns:
-        df["First Name"] = df["First Name"].astype(str).str.strip().fillna("")
+        df["First Name"] = df["First Name"].fillna("").astype(str).str.strip()
+    if "MI" in df.columns:
+        df["MI"] = df["MI"].fillna("").astype(str).str.strip()
     if "Telephone" in df.columns:
-        df["Telephone"] = df["Telephone"].astype(str).str.strip().fillna("")
+        df["Telephone"] = df["Telephone"].fillna("").astype(str).str.strip()
 
-    # Start with First Name 
+    # Start with First Name
     if "First Name" in df.columns and df["First Name"].any():
         df["ClientID"] = df["First Name"]
 
-        # Find duplicates on ClientID
+        # Find duplicates
         duplicates = df[df["ClientID"].duplicated(keep=False)]
 
         if not duplicates.empty:
-            if "Telephone" in df.columns:
-                mask = df["ClientID"].isin(duplicates["ClientID"])
+            # Add MI where available (skip if blank)
+            if "MI" in df.columns:
+                mask = df["ClientID"].isin(duplicates["ClientID"]) & (df["MI"] != "")
+                df.loc[mask, "ClientID"] = (
+                    df.loc[mask, "First Name"] + "_" + df.loc[mask, "MI"]
+                ).str.strip("_")
 
-                # Add Telephone where available
-                df.loc[mask & (df["Telephone"] != ""), "ClientID"] = (
-                    df.loc[mask & (df["Telephone"] != ""), "First Name"] + "_" +
-                    df.loc[mask & (df["Telephone"] != ""), "Telephone"])
+            # Re-check duplicates
+            duplicates = df[df["ClientID"].duplicated(keep=False)]
 
-                # Check if duplicates still exist after adding telephone
-                remaining_dups = df[df["ClientID"].duplicated(keep=False)]
+            if not duplicates.empty:
+                # Add Telephone where available (skip if blank)
+                if "Telephone" in df.columns:
+                    mask = df["ClientID"].isin(duplicates["ClientID"]) & (df["Telephone"] != "")
+                    df.loc[mask, "ClientID"] = (
+                        df.loc[mask, "ClientID"] + "_" + df.loc[mask, "Telephone"]
+                    ).str.strip("_")
 
-                if not remaining_dups.empty:
-                    # Append index to duplicates without unique telephone
-                    df.loc[remaining_dups.index, "ClientID"] = (
-                        df.loc[remaining_dups.index, "ClientID"] + "_" +
-                        df.loc[remaining_dups.index].groupby("ClientID").cumcount().astype(str))
-            else:
-                # No telephone column, append index to duplicates
-                df.loc[duplicates.index, "ClientID"] = (
-                    df.loc[duplicates.index, "ClientID"] + "_" +
-                    df.loc[duplicates.index].groupby("ClientID").cumcount().astype(str))
+                # Re-check duplicates
+                duplicates = df[df["ClientID"].duplicated(keep=False)]
+
+                if not duplicates.empty:
+                    # Append index
+                    df.loc[duplicates.index, "ClientID"] = (
+                        df.loc[duplicates.index, "ClientID"] + "_" +
+                        df.loc[duplicates.index].groupby("ClientID").cumcount().astype(str)
+                    )
 
     elif "Telephone" in df.columns and df["Telephone"].any():
         df["ClientID"] = df["Telephone"]
 
     else:
-        print("No 'First Name' column found; skipping ClientID creation.")
+        print("No 'First Name' or 'Telephone' column found; skipping ClientID creation.")
+
+    # Map to numeric IDs while preserving uniqueness
+    unique_ids = {val: i+1 for i, val in enumerate(df["ClientID"].unique())}
+    df["ClientID"] = df["ClientID"].map(unique_ids)
 
     return df
-
 
 def transform_data(intake, demographics, salaries, phone_calls, meetings):
     """
@@ -83,6 +95,8 @@ def transform_data(intake, demographics, salaries, phone_calls, meetings):
     - Create ClientIDs
     - Return cleaned dataframes
     """
+
+    # Create ClientID 
     intake = client_id(intake)
     demographics = client_id(demographics)
     salaries = client_id(salaries)
@@ -99,6 +113,11 @@ def merge_export(intake, demographics, salaries, phone_calls, meetings):
     - Merge intake, meetings, salaries by ClientID
     - Merge phone_calls by Telephone
     """
+    # Drop 'First Name' from all files except demographics
+    for df in [intake, salaries, phone_calls, meetings]:
+        if "First Name" in df.columns:
+            df.drop(columns=["First Name"], inplace=True)
+
     # Start from demographics
     client_data = demographics.merge(intake, on="ClientID", how="outer", suffixes=("_Demo", "_Intake"))
     client_data = client_data.merge(meetings, on="ClientID", how="outer", suffixes=("", "_Meeting"))
