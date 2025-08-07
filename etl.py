@@ -1,4 +1,7 @@
 import pandas as pd
+import os
+from dotenv import load_dotenv
+import dropbox
 
 
 def extract_excel():
@@ -150,6 +153,16 @@ def main():
     merged_data = merge_export(intake, demographics, salaries, phone_calls, meetings)
     print("Merging complete! File saved as clients_data.xlsx")
 
+    # Upload merge file directly to Dropbox 
+    load_dotenv()
+    ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
+    dbx = dropbox.Dropbox(ACCESS_TOKEN)
+
+    local_path = "/Users/sa17/Library/Mobile Documents/com~apple~CloudDocs/Brag Folder/projects/Womens-Mentoring-Network/data/merge/clients_data.xlsx"
+
+    with open(local_path, "rb") as f:
+        dbx.files_upload(f.read(), "/clients_data.xlsx", mode=dropbox.files.WriteMode("overwrite"))
+    print("Uploaded to Dropbox")
 
 if __name__ == "__main__":
     main()
